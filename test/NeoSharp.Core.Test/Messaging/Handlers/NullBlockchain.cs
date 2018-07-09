@@ -11,13 +11,16 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
 {
     class NullBlockchain : IBlockchain
     {
-        Block _current = new Block();
+        public Block CurrentBlock { get; } = new Block();
 
-        public Block CurrentBlock => _current;
-
-        public BlockHeader LastBlockHeader => CurrentBlock;
+        public BlockHeaderBase LastBlockHeader => CurrentBlock;
 
         public StampedPool<UInt256, Transaction> MemoryPool => new StampedPool<UInt256, Transaction>(PoolMaxBehaviour.DontAllowMore, 0, x => x.Value.Hash, null);
+
+        public Task InitializeBlockchain()
+        {
+            throw new NotImplementedException();
+        }
 
         public bool AddBlock(Block block)
         {
@@ -49,12 +52,12 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
             throw new NotImplementedException();
         }
 
-        public Block GetBlock(uint height)
+        public Task<Block> GetBlock(uint height)
         {
             throw new NotImplementedException();
         }
 
-        public Block GetBlock(UInt256 hash)
+        public Task<Block> GetBlock(UInt256 hash)
         {
             throw new NotImplementedException();
         }
@@ -79,22 +82,22 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
             yield break;
         }
 
-        public IEnumerable<Block> GetBlocks(IReadOnlyCollection<UInt256> blockHashes)
+        public Task<IEnumerable<Block>> GetBlocks(IReadOnlyCollection<UInt256> blockHashes)
         {
             throw new NotImplementedException();
         }
 
-        public UInt256 GetBlockHash(uint height)
+        public Task<UInt256> GetBlockHash(uint height)
         {
             throw new NotImplementedException();
         }
 
-        public BlockHeader GetBlockHeader(uint height)
+        public Task<BlockHeader> GetBlockHeader(uint height)
         {
             throw new NotImplementedException();
         }
 
-        public BlockHeader GetBlockHeader(UInt256 hash)
+        public Task<BlockHeader> GetBlockHeader(UInt256 hash)
         {
             throw new NotImplementedException();
         }
@@ -109,17 +112,17 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
             throw new NotImplementedException();
         }
 
-        public Block GetNextBlock(UInt256 hash)
+        public Task<Block> GetNextBlock(UInt256 hash)
         {
             throw new NotImplementedException();
         }
 
-        public UInt256 GetNextBlockHash(UInt256 hash)
+        public Task<UInt256> GetNextBlockHash(UInt256 hash)
         {
             throw new NotImplementedException();
         }
 
-        public long GetSysFeeAmount(uint height)
+        public Task<long> GetSysFeeAmount(uint height)
         {
             throw new NotImplementedException();
         }
@@ -129,7 +132,7 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
             throw new NotImplementedException();
         }
 
-        public Transaction GetTransaction(UInt256 hash)
+        public Task<Transaction> GetTransaction(UInt256 hash)
         {
             throw new NotImplementedException();
         }
@@ -139,7 +142,7 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
             throw new NotImplementedException();
         }
 
-        public IEnumerable<Transaction> GetTransactions(IReadOnlyCollection<UInt256> transactionHashes)
+        public Task<IEnumerable<Transaction>> GetTransactions(IReadOnlyCollection<UInt256> transactionHashes)
         {
             throw new NotImplementedException();
         }
@@ -159,7 +162,7 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
             throw new NotImplementedException();
         }
 
-        public void AddBlockHeaders(IEnumerable<BlockHeader> blockHeaders)
+        public void AddBlockHeaders(IEnumerable<BlockHeaderBase> blockHeaders)
         {
             throw new NotImplementedException();
         }

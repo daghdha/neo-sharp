@@ -35,6 +35,10 @@
         ConsolePercentWriter CreatePercent(long maxValue = 100);
 
         /// <summary>
+        /// Write prompt
+        /// </summary>
+        void WritePrompt();
+        /// <summary>
         /// Write output into console
         /// </summary>
         /// <param name="output">Output</param>
@@ -46,5 +50,12 @@
         /// <param name="line">Line</param>
         /// <param name="style">Style</param>
         void WriteLine(string line, ConsoleOutputStyle style = ConsoleOutputStyle.Output);
+        /// <summary>
+        /// Write object
+        /// </summary>
+        /// <param name="obj">Object</param>
+        /// <param name="output">Output</param>
+        /// <param name="style">Style</param>
+        void WriteObject(object obj, PromptOutputStyle output, ConsoleOutputStyle style = ConsoleOutputStyle.Output);
     }
 }

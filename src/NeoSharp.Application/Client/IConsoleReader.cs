@@ -7,6 +7,11 @@ namespace NeoSharp.Application.Client
     public interface IConsoleReader
     {
         /// <summary>
+        /// State
+        /// </summary>
+        ConsoleReaderState State { get; }
+
+        /// <summary>
         /// Read password
         /// </summary>
         /// <returns>Reteurn Secure string password</returns>

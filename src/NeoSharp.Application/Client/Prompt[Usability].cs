@@ -1,15 +1,53 @@
-﻿using NeoSharp.Application.Attributes;
-using NeoSharp.Core.Types;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using NeoSharp.Application.Attributes;
+using NeoSharp.Core.Logging;
+using NeoSharp.Core.Types;
 
 namespace NeoSharp.Application.Client
 {
     public partial class Prompt : IPrompt
     {
+        [Flags]
+        public enum LogVerbose : byte
+        {
+            Off = 0,
+
+            Trace = 1,
+            Debug = 2,
+            Information = 4,
+            Warning = 8,
+            Error = 16,
+            Critical = 32,
+
+            All = Trace | Debug | Information | Warning | Error | Critical
+        }
+
+        private readonly Dictionary<LogLevel, LogVerbose> _logFlagProxy = new Dictionary<LogLevel, LogVerbose>()
+        {
+            { LogLevel.Trace, LogVerbose.Trace},
+            { LogLevel.Debug, LogVerbose.Debug},
+            { LogLevel.Information, LogVerbose.Information},
+            { LogLevel.Warning, LogVerbose.Warning},
+            { LogLevel.Error, LogVerbose.Error},
+            { LogLevel.Critical, LogVerbose.Critical},
+        };
+        private LogVerbose _logVerbose = LogVerbose.Off;
+
+        private void Log_OnLog(LogEntry log)
+        {
+            if (_logVerbose.HasFlag(_logFlagProxy[log.Level]))
+            {
+                return;
+            }
+
+            _logs.Add(log);
+        }
+
         private StreamWriter _record;
 
         /// <summary>
@@ -70,6 +108,30 @@ namespace NeoSharp.Application.Client
                     foreach (var par in modes)
                         _consoleWriter.WriteLine("  " + par, ConsoleOutputStyle.Information);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Enable / Disable logs
+        /// </summary>
+        /// <param name="mode">Mode</param>
+        [PromptCommand("log", Help = "Enable/Disable log output", Category = "Usability")]
+        private void LogCommand(LogVerbose mode)
+        {
+            _logVerbose = mode;
+
+            if (mode != LogVerbose.Off)
+            {
+                _loggerFactory.OnLog -= Log_OnLog;
+                _loggerFactory.OnLog += Log_OnLog;
+
+                _logger.LogDebug("Log output is enabled");
+            }
+            else
+            {
+                _logger.LogDebug("Log output is disabled");
+
+                _loggerFactory.OnLog -= Log_OnLog;
             }
         }
 
@@ -197,7 +259,7 @@ namespace NeoSharp.Application.Client
         private void HelpCommand()
         {
             string lastCat = null, lastCom = null;
-            foreach (string[] key in _commandCache.Keys.OrderBy(u => _commandCache[u].Category + "\n" + u))
+            foreach (string[] key in _commandCache.Keys.OrderBy(u => _commandCache[u].Category + "\n" + string.Join("", u)))
             {
                 var c = _commandCache[key];
 

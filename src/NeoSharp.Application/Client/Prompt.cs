@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NeoSharp.Application.Attributes;
 using NeoSharp.BinarySerialization;
 using NeoSharp.Core.Blockchain;
@@ -10,15 +13,13 @@ using NeoSharp.Core.Logging;
 using NeoSharp.Core.Network;
 using NeoSharp.Core.Network.Rpc;
 using NeoSharp.Core.Types;
-using Newtonsoft.Json;
+using NeoSharp.Core.Wallet;
 
 namespace NeoSharp.Application.Client
 {
     public partial class Prompt : IPrompt
     {
         #region Variables
-
-        public enum PromptOutputStyle { json, raw };
 
         /// <summary>
         /// Exit flag
@@ -39,7 +40,7 @@ namespace NeoSharp.Application.Client
         /// <summary>
         /// Logger
         /// </summary>
-        private readonly ILogger<Prompt> _logger;
+        private readonly Core.Logging.ILogger<Prompt> _logger;
         /// <summary>
         /// Network manager
         /// </summary>
@@ -57,13 +58,32 @@ namespace NeoSharp.Application.Client
         /// </summary>
         private readonly IRpcServer _rpc;
         /// <summary>
+        /// The wallet.
+        /// </summary>
+        private readonly IWalletManager _walletManager;
+        /// <summary>
         /// Command cache
         /// </summary>
         private static readonly IDictionary<string[], PromptCommandAttribute> _commandCache;
         private static readonly IDictionary<string, List<ParameterInfo[]>> _commandAutocompleteCache;
 
+        private readonly ILoggerFactoryExtended _loggerFactory;
+
         public delegate void delOnCommandRequested(IPrompt prompt, PromptCommandAttribute cmd, string commandLine);
         public event delOnCommandRequested OnCommandRequested;
+
+        private readonly ConcurrentBag<LogEntry> _logs;
+
+        private static readonly Dictionary<LogLevel, ConsoleOutputStyle> _logStyle = new Dictionary<LogLevel, ConsoleOutputStyle>()
+        {
+            { LogLevel.Critical, ConsoleOutputStyle.Error },
+            { LogLevel.Error, ConsoleOutputStyle.Error },
+            { LogLevel.Information, ConsoleOutputStyle.Log },
+            { LogLevel.None, ConsoleOutputStyle.Log },
+            { LogLevel.Trace, ConsoleOutputStyle.Log },
+            { LogLevel.Warning, ConsoleOutputStyle.Log },
+            { LogLevel.Debug, ConsoleOutputStyle.Log }
+        };
 
         #endregion
 
@@ -111,15 +131,25 @@ namespace NeoSharp.Application.Client
         /// </summary>
         /// <param name="consoleReaderInit">Console reader init</param>
         /// <param name="consoleWriterInit">Console writer init</param>
+        /// <param name="loggerFactory">Logget factory</param>
         /// <param name="logger">Logger</param>
         /// <param name="networkManagerInit">Network manger init</param>
         /// <param name="serverInit">Server</param>
         /// <param name="rpcInit">Rpc server</param>
         /// <param name="serializer">Binary serializer</param>
         /// <param name="blockchain">Blockchain</param>
-        public Prompt(IConsoleReader consoleReaderInit, IConsoleWriter consoleWriterInit,
-            ILogger<Prompt> logger, INetworkManager networkManagerInit,
-            IServer serverInit, IRpcServer rpcInit, IBinarySerializer serializer, IBlockchain blockchain)
+        /// <param name="walletManager"></param>
+        public Prompt(
+            IConsoleReader consoleReaderInit, 
+            IConsoleWriter consoleWriterInit,
+            ILoggerFactoryExtended loggerFactory, 
+            Core.Logging.ILogger<Prompt> logger, 
+            INetworkManager networkManagerInit,
+            IServer serverInit, 
+            IRpcServer rpcInit, 
+            IBinarySerializer serializer, 
+            IBlockchain blockchain, 
+            IWalletManager walletManager)
         {
             _consoleReader = consoleReaderInit;
             _consoleWriter = consoleWriterInit;
@@ -129,12 +159,16 @@ namespace NeoSharp.Application.Client
             _serializer = serializer;
             _rpc = rpcInit;
             _blockchain = blockchain;
+            _loggerFactory = loggerFactory;
+            _logs = new ConcurrentBag<LogEntry>();
+            _walletManager = walletManager;
         }
 
+        /// <inheritdoc />
         public void StartPrompt(string[] args)
         {
             _logger.LogInformation("Starting Prompt");
-            _consoleWriter.WriteLine("Neo-Sharp");
+            _consoleWriter.WriteLine("Neo-Sharp", ConsoleOutputStyle.Prompt);
 
             if (args != null)
             {
@@ -143,10 +177,30 @@ namespace NeoSharp.Application.Client
                 _consoleReader.AppendInputs(args);
             }
 
+            this._blockchain.InitializeBlockchain();
+
             while (!_exit)
             {
+                // Read log buffer
+
+                while (_logs.TryTake(out var log))
+                {
+                    _consoleWriter.WriteLine
+                        (
+                        "[" + log.Level + (string.IsNullOrEmpty(log.Category) ? "" : "-" + log.Category) + "] " +
+                        log.MessageWithError, _logStyle[log.Level]
+                        );
+                }
+
+                // Read input
                 var fullCmd = _consoleReader.ReadFromConsole(_commandAutocompleteCache);
-                if (string.IsNullOrWhiteSpace(fullCmd)) continue;
+
+                if (string.IsNullOrWhiteSpace(fullCmd))
+                {
+                    continue;
+                }
+
+                _logger.LogInformation("Execute: " + fullCmd);
 
                 Execute(fullCmd);
             }
@@ -154,7 +208,7 @@ namespace NeoSharp.Application.Client
             _consoleWriter.WriteLine("Exiting", ConsoleOutputStyle.Information);
         }
 
-        IEnumerable<PromptCommandAttribute> SearchCommands(string command, List<CommandToken> cmdArgs)
+        private static IEnumerable<PromptCommandAttribute> SearchCommands(string command, List<CommandToken> cmdArgs)
         {
             // Parse arguments
 
@@ -183,9 +237,9 @@ namespace NeoSharp.Application.Client
             }
         }
 
-        PromptCommandAttribute SearchRightCommand(PromptCommandAttribute[] cmds, IEnumerable<CommandToken> args)
+        private static PromptCommandAttribute SearchRightCommand(IReadOnlyList<PromptCommandAttribute> cmds, IEnumerable<CommandToken> args)
         {
-            switch (cmds.Length)
+            switch (cmds.Count)
             {
                 case 0: return null;
                 case 1: return cmds[0];
@@ -212,11 +266,7 @@ namespace NeoSharp.Application.Client
             }
         }
 
-        /// <summary>
-        /// Execute command
-        /// </summary>
-        /// <param name="command">Command</param>
-        /// <returns>Return false if fail</returns>
+        /// <inheritdoc />
         public bool Execute(string command)
         {
             command = command.Trim();
@@ -260,38 +310,6 @@ namespace NeoSharp.Application.Client
 
                 PrintHelp(cmds);
                 return false;
-            }
-        }
-
-        /// <summary>
-        /// Write object
-        /// </summary>
-        /// <param name="obj">Object</param>
-        /// <param name="output">Output</param>
-        private void WriteObject(object obj, PromptOutputStyle output)
-        {
-            if (obj == null)
-            {
-                _consoleWriter.WriteLine("NULL", ConsoleOutputStyle.Error);
-                return;
-            }
-
-            switch (output)
-            {
-                case PromptOutputStyle.json:
-                    {
-                        _consoleWriter.WriteLine(JsonConvert.SerializeObject(obj, Formatting.Indented));
-                        break;
-                    }
-                case PromptOutputStyle.raw:
-                    {
-                        if (obj is byte[] data)
-                            _consoleWriter.WriteLine(data.ToHexString(true));
-                        else
-                            _consoleWriter.WriteLine(_serializer.Serialize(obj).ToHexString(true));
-
-                        break;
-                    }
             }
         }
     }
