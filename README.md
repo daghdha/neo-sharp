@@ -26,6 +26,8 @@
 
 # Overview
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/5d33ba279ad74b34956011ace4f89469)](https://app.codacy.com/app/daghdha/neo-sharp?utm_source=github.com&utm_medium=referral&utm_content=daghdha/neo-sharp&utm_campaign=badger)
+
 Neo-sharp is a new core and node implementation of NEO with three main project goals:
 
 - To break interdependencies in NEO and allow a plug-able modular design to be used by node implementations. The modules will consist in: Network, VM, Persistence and Consensus.
