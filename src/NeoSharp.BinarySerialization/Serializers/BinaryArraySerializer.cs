@@ -6,13 +6,21 @@ namespace NeoSharp.BinarySerialization.Serializers
 {
     public class BinaryArraySerializer : IBinaryCustomSerializable
     {
-        private readonly Type Type, ItemType;
-        private readonly IBinaryCustomSerializable Serializer;
+        #region Private fields
+
+        private readonly Type _type, _itemType;
+        private readonly IBinaryCustomSerializable _serializer;
+
+        #endregion
+
+        #region Public fields
 
         /// <summary>
         /// Max length
         /// </summary>
         public readonly int MaxLength;
+
+        #endregion
 
         /// <summary>
         /// Constructor
@@ -22,9 +30,9 @@ namespace NeoSharp.BinarySerialization.Serializers
         /// <param name="maxLength">Max length</param>
         public BinaryArraySerializer(Type typeArray, IBinaryCustomSerializable serializer, int maxLength = ushort.MaxValue)
         {
-            Type = typeArray;
-            ItemType = typeArray.GetElementType();
-            Serializer = serializer;
+            _type = typeArray;
+            _itemType = typeArray.GetElementType();
+            _serializer = serializer;
             MaxLength = maxLength;
         }
 
@@ -43,7 +51,7 @@ namespace NeoSharp.BinarySerialization.Serializers
 
             foreach (var o in ar)
             {
-                x += Serializer.Serialize(serializer, writer, o, settings);
+                x += _serializer.Serialize(serializer, writer, o, settings);
             }
 
             return x;
@@ -54,11 +62,11 @@ namespace NeoSharp.BinarySerialization.Serializers
             var l = (int)reader.ReadVarInt(ushort.MaxValue);
             if (l > MaxLength) throw new FormatException(nameof(MaxLength));
 
-            var a = (Array)Activator.CreateInstance(Type, l);
+            var a = (Array)Activator.CreateInstance(_type, l);
 
             for (var ix = 0; ix < l; ix++)
             {
-                a.SetValue(Serializer.Deserialize(deserializer, reader, ItemType, settings), ix);
+                a.SetValue(_serializer.Deserialize(deserializer, reader, _itemType, settings), ix);
             }
 
             return a;

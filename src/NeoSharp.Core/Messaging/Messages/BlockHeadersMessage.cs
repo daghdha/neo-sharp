@@ -5,39 +5,36 @@ using NeoSharp.Core.Models;
 
 namespace NeoSharp.Core.Messaging.Messages
 {
-    public class BlockHeadersMessage : Message<HeadersPayload>
+    public class BlockHeadersMessage : Message<BlockHeadersPayload>
     {
         public BlockHeadersMessage()
         {
             Command = MessageCommand.headers;
-            Payload = new HeadersPayload { Headers = new HeaderPayload[] { } };
+            Payload = new BlockHeadersPayload { Headers = new BlockHeader[0] };
         }
 
         public BlockHeadersMessage(IEnumerable<BlockHeader> headers)
         {
             Command = MessageCommand.headers;
-            Payload = new HeadersPayload { Headers = headers.Select(u => new HeaderPayload() { Dummy = 0, Header = u }).ToArray() };
+            Payload = new BlockHeadersPayload
+            {
+                Headers = headers.Select
+                (
+                    u =>
+                    {
+                        // We need to ensure that is sent without TX 
+
+                        return u.Trim();
+                    }
+                )
+                .ToArray()
+            };
         }
     }
 
-    public class HeaderPayload
-    {
-        #region Serializable data
-
-        [BinaryProperty(0)]
-        public BlockHeaderBase Header;
-
-        // TODO: if (reader.ReadByte() != 0) throw new FormatException();
-
-        [BinaryProperty(1)]
-        public byte Dummy;
-
-        #endregion
-    }
-
-    public class HeadersPayload
+    public class BlockHeadersPayload
     {
         [BinaryProperty(0)]
-        public HeaderPayload[] Headers;
+        public BlockHeader[] Headers;
     }
 }

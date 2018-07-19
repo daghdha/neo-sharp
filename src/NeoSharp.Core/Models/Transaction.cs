@@ -4,7 +4,6 @@ using NeoSharp.BinarySerialization;
 using NeoSharp.BinarySerialization.SerializationHooks;
 using NeoSharp.Core.Converters;
 using NeoSharp.Core.Cryptography;
-using NeoSharp.Core.Persistence;
 using NeoSharp.Core.Types;
 using Newtonsoft.Json;
 
@@ -51,10 +50,18 @@ namespace NeoSharp.Core.Models
         #region Signature
 
         [BinaryProperty(255)]
-        [JsonProperty("scripts")]
-        public Witness[] Scripts;
+        [JsonProperty("witness")]
+        public Witness[] Witness;
 
         #endregion
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        public Transaction()
+        {
+            // Just for serialization
+        }
 
         /// <summary>
         /// Constructor
@@ -103,10 +110,10 @@ namespace NeoSharp.Core.Models
 
             // Deserialize signature
 
-            if (settings?.Filter?.Invoke(nameof(Scripts)) != false)
+            if (settings?.Filter?.Invoke(nameof(Witness)) != false)
             {
-                Scripts = deserializer.Deserialize<Witness[]>(reader, settings);
-                if (Scripts.Length > ushort.MaxValue) throw new FormatException(nameof(Scripts));
+                Witness = deserializer.Deserialize<Witness[]>(reader, settings);
+                if (Witness.Length > ushort.MaxValue) throw new FormatException(nameof(Witness));
             }
         }
 
@@ -138,9 +145,9 @@ namespace NeoSharp.Core.Models
 
             // Serialize sign
 
-            if (settings?.Filter?.Invoke(nameof(Scripts)) != false)
+            if (settings?.Filter?.Invoke(nameof(Witness)) != false)
             {
-                ret += serializer.Serialize(Scripts, writer, settings);
+                ret += serializer.Serialize(Witness, writer, settings);
             }
 
             return ret;
@@ -175,20 +182,18 @@ namespace NeoSharp.Core.Models
         /// <summary>
         /// Update Hash
         /// </summary>
-        /// <param name="serializer">Serializer</param>
-        /// <param name="crypto">Crypto</param>
-        public void UpdateHash(IBinarySerializer serializer, ICrypto crypto)
+        public void UpdateHash()
         {
-            Hash = new UInt256(crypto.Hash256(serializer.Serialize(this, new BinarySerializerSettings()
+            Hash = new UInt256(Crypto.Default.Hash256(BinarySerializer.Default.Serialize(this, new BinarySerializerSettings()
             {
-                Filter = (a) => a != nameof(Scripts)
+                Filter = (a) => a != nameof(Witness)
             })));
 
-            if (Scripts != null)
+            if (Witness != null)
             {
-                foreach (var script in Scripts)
+                foreach (var w in Witness)
                 {
-                    script.UpdateHash(serializer, crypto);
+                    w.UpdateHash();
                 }
             }
         }

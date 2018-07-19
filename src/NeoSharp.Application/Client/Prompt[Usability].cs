@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NeoSharp.Application.Attributes;
 using NeoSharp.Core.Logging;
@@ -40,7 +42,7 @@ namespace NeoSharp.Application.Client
 
         private void Log_OnLog(LogEntry log)
         {
-            if (_logVerbose.HasFlag(_logFlagProxy[log.Level]))
+            if (!_logVerbose.HasFlag(_logFlagProxy[log.Level]))
             {
                 return;
             }
@@ -58,7 +60,7 @@ namespace NeoSharp.Application.Client
         {
             // Print help
 
-            PromptCommandAttribute cmd = cmds.FirstOrDefault();
+            var cmd = cmds.FirstOrDefault();
 
             if (cmd != null && !string.IsNullOrEmpty(cmd.Help))
             {
@@ -69,20 +71,20 @@ namespace NeoSharp.Application.Client
 
                 // How to use?
 
-                List<string> modes = new List<string>();
+                var modes = new List<string>();
                 foreach (var v in cmds)
                 {
-                    string args = "";
+                    var args = "";
 
                     if (v.Parameters != null && v.Parameters.Length > 0)
                     {
                         foreach (var par in v.Parameters)
                         {
-                            string allowed = "";
+                            var allowed = "";
 
                             if (par.ParameterType.IsEnum)
                             {
-                                foreach (object o in Enum.GetValues(par.ParameterType))
+                                foreach (var o in Enum.GetValues(par.ParameterType))
                                     allowed += (allowed != "" ? "," : "") + o.ToString();
 
                                 allowed = $" {par.Name}={allowed}";
@@ -129,9 +131,64 @@ namespace NeoSharp.Application.Client
             }
             else
             {
+                _logs.Clear();
                 _logger.LogDebug("Log output is disabled");
 
                 _loggerFactory.OnLog -= Log_OnLog;
+            }
+        }
+
+        /// <summary>
+        /// Watch
+        /// </summary>
+        /// <param name="ms">Miliseconds</param>
+        /// <param name="line">Line</param>
+        [PromptCommand("watch", Help = "Watch command", Category = "Usability")]
+        private void WatchCommand(uint ms, [PromptCommandParameterBody] string line)
+        {
+            if (line.Trim().ToLowerInvariant().StartsWith("watch"))
+            {
+                throw new InvalidOperationException();
+            }
+
+            using (var cancel = new CancellationTokenSource())
+            {
+                // Cancellation listener (wait any key)
+
+                new Task(async () =>
+                  {
+                      while (!cancel.IsCancellationRequested)
+                      {
+                          if (_consoleReader.KeyAvailable)
+                          {
+                              cancel.Cancel();
+                              return;
+                          }
+                          await Task.Delay(10, cancel.Token);
+                      }
+                  }).Start();
+
+                // watch logic
+
+                while (!cancel.IsCancellationRequested)
+                {
+                    _consoleWriter.Clear();
+
+                    if (!Execute(line))
+                    {
+                        break;
+                    }
+
+                    try
+                    {
+                        var ret = Task.Delay((int)ms, cancel.Token);
+                        ret.Wait();
+                    }
+                    catch
+                    {
+                        break;
+                    }
+                }
             }
         }
 
@@ -259,7 +316,7 @@ namespace NeoSharp.Application.Client
         private void HelpCommand()
         {
             string lastCat = null, lastCom = null;
-            foreach (string[] key in _commandCache.Keys.OrderBy(u => _commandCache[u].Category + "\n" + string.Join("", u)))
+            foreach (var key in _commandCache.Keys.OrderBy(u => _commandCache[u].Category + "\n" + string.Join("", u)))
             {
                 var c = _commandCache[key];
 
@@ -271,7 +328,7 @@ namespace NeoSharp.Application.Client
                     _consoleWriter.WriteLine(lastCat, ConsoleOutputStyle.Information);
                 }
 
-                string command = string.Join(" ", key);
+                var command = string.Join(" ", key);
                 if (lastCom == command) continue;
 
                 lastCom = command;

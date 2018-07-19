@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
@@ -6,8 +6,11 @@
 
   <ItemGroup>
     <Compile Remove="Network\Tcp\**" />
+    <Compile Remove="Persistence\**" />
     <EmbeddedResource Remove="Network\Tcp\**" />
+    <EmbeddedResource Remove="Persistence\**" />
     <None Remove="Network\Tcp\**" />
+    <None Remove="Persistence\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,7 +32,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Persistence\" />
     <Folder Include="Wallet\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

@@ -21,12 +21,21 @@ namespace NeoSharp.BinarySerialization.Cache
         /// <param name="asms">Assemblies</param>
         public static void RegisterTypes(params Assembly[] asms)
         {
-            foreach (Assembly asm in asms)
+            foreach (var asm in asms)
             {
-                foreach (var t in asm.GetTypes())
-                {
-                    InternalRegisterTypes(t);
-                }
+                RegisterTypes(asm.GetTypes());
+            }
+        }
+
+        /// <summary>
+        /// Cache types (call me if you load a new plugin or module)
+        /// </summary>
+        /// <param name="types">Types</param>
+        public static void RegisterTypes(params Type[] types)
+        {
+            foreach (var t in types)
+            {
+                InternalRegisterTypes(t);
             }
         }
 
@@ -53,9 +62,23 @@ namespace NeoSharp.BinarySerialization.Cache
                 {
                     // Create one by his fields and properties
 
-                    serializer = new BinaryAutoSerializer(type);
+                    if (type.IsEnum)
+                    {
+                        if (BinarySerializerCacheEntry.TryRecursive(null, type.GetEnumUnderlyingType(), out var ret, -1))
+                        {
+                            serializer = new BinaryEnumSerializer(type, ret);
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        serializer = new BinaryAutoSerializer(type);
 
-                    if (((BinaryAutoSerializer)serializer).IsEmpty) return null;
+                        if (((BinaryAutoSerializer)serializer).IsEmpty) return null;
+                    }
                 }
 
                 Cache.Add(type, serializer);
@@ -64,7 +87,7 @@ namespace NeoSharp.BinarySerialization.Cache
                 {
                     // Register array too
 
-                    Type array = type.MakeArrayType();
+                    var array = type.MakeArrayType();
                     Cache.Add(array, new BinaryArraySerializer(array, serializer));
                 }
 

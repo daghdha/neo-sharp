@@ -9,8 +9,6 @@ namespace NeoSharp.Core.Network
         private static readonly Regex EndPointPattern =
             new Regex(@"^(?<proto>\w+)://(?<address>[^/]+)/?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static readonly string DefaultProtocol = Protocol.Tcp.ToString();
-
         /// <summary>
         /// Protocol
         /// </summary>
@@ -35,22 +33,33 @@ namespace NeoSharp.Core.Network
         /// Constructor
         /// </summary>
         /// <param name="protocol">Protocol</param>
-        /// <param name="endPoint">Endpoint</param>
-        public EndPoint(Protocol protocol, IPEndPoint endPoint)
+        /// <param name="ipEndPoint">IP Endpoint</param>
+        public EndPoint(Protocol protocol, IPEndPoint ipEndPoint)
         {
             Protocol = protocol;
-            Host = endPoint.Address.ToString();
-            Port = endPoint.Port;
+            Host = ipEndPoint.Address.ToString();
+            Port = ipEndPoint.Port;
         }
 
         /// <summary>
         /// Get IpEndPoint
         /// </summary>
-        public IPEndPoint ToEndPoint()
+        public IPEndPoint ToIpEndPoint()
         {
-            // TODO: check dns
-
-            return new IPEndPoint(IPAddress.Parse(Host), Port);
+            var uriType = Uri.CheckHostName(Host);
+            if (uriType == UriHostNameType.Dns)
+            {
+                //check dns
+                var hostEntry = Dns.GetHostEntry(Host);
+                if (hostEntry.AddressList.Length == 0) return null;
+            }
+            IPAddress ipAddress;
+            IPEndPoint ipEndPoint = null;
+            if (IPAddress.TryParse(Host, out ipAddress))
+            {
+                ipEndPoint = new IPEndPoint(ipAddress, Port);
+            }
+            return ipEndPoint;
         }
 
         public static EndPoint Parse(string value)
@@ -101,8 +110,6 @@ namespace NeoSharp.Core.Network
 
         private static EndPoint Parse(string protocol, string address)
         {
-            if (protocol == null) protocol = DefaultProtocol;
-
             var host = address;
             var port = 0;
 
@@ -115,10 +122,14 @@ namespace NeoSharp.Core.Network
                 port = int.Parse(address.Substring(portIndex + 1));
             }
 
-            // TODO: More safe parsing
+            if (!Enum.TryParse(typeof(Protocol), protocol, true, out var protocolEnum))
+            {
+                protocolEnum = Protocol.Unknown;
+            }
+
             return new EndPoint
             {
-                Protocol = Enum.Parse<Protocol>(protocol, true),
+                Protocol = (Protocol)protocolEnum,
                 Host = host,
                 Port = port
             };

@@ -25,6 +25,11 @@ namespace NeoSharp.Application.Client
         /// </summary>
         public ConsoleReaderState State { get; private set; } = ConsoleReaderState.None;
 
+        /// <summary>
+        /// Key available
+        /// </summary>
+        public bool KeyAvailable => Console.KeyAvailable;
+
         #endregion
 
         #region Private fields
@@ -62,9 +67,15 @@ namespace NeoSharp.Application.Client
         /// <summary>
         /// Read password
         /// </summary>
+        /// <param name="promptLabel">Prompt label</param>
         /// <returns>Reteurn Secure string password</returns>
-        public SecureString ReadPassword()
+        public SecureString ReadPassword(bool promptLabel = true)
         {
+            if (promptLabel)
+            {
+                _consoleWriter.WriteLine("Password: ");
+            }
+
             State = ConsoleReaderState.ReadingPassword;
 
             Console.ForegroundColor = ConsoleColor.Cyan;

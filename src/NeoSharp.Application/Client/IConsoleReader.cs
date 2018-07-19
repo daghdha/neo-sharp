@@ -12,10 +12,16 @@ namespace NeoSharp.Application.Client
         ConsoleReaderState State { get; }
 
         /// <summary>
+        /// Key available
+        /// </summary>
+        bool KeyAvailable { get; }
+
+        /// <summary>
         /// Read password
         /// </summary>
+        /// <param name="promptLabel">Prompt label</param>
         /// <returns>Reteurn Secure string password</returns>
-        SecureString ReadPassword();
+        SecureString ReadPassword(bool promptLabel = true);
         /// <summary>
         /// Read string from console
         /// </summary>

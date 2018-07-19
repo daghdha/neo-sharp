@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using NeoSharp.Core.Blockchain;
 using NeoSharp.Core.Cryptography;
+using NeoSharp.Core.Extensions;
 using NeoSharp.Core.Logging;
 using NeoSharp.Core.Messaging.Messages;
 using NeoSharp.Core.Models;
@@ -52,46 +53,53 @@ namespace NeoSharp.Core.Messaging.Handlers
             switch (inventoryType)
             {
                 case InventoryType.Transaction:
-                {
-                    await SendTransactions(hashes, sender);
-                    break;
-                }
+                    {
+                        await SendTransactions(hashes, sender);
+                        break;
+                    }
 
                 case InventoryType.Block:
-                {
-                    await SendBlocks(hashes, sender);
-                    break;
-                }
+                    {
+                        await SendBlocks(hashes, sender);
+                        break;
+                    }
 
                 case InventoryType.Consensus:
-                {
-                    // TODO: Implement after consensus
-                    break;
-                }
+                    {
+                        // TODO: Implement after consensus
+                        break;
+                    }
 
                 default:
-                {
-                    _logger.LogError($"The payload of {nameof(InventoryMessage)} contains unknown {nameof(InventoryType)} \"{inventoryType}\".");
-                    break;
-                }
+                    {
+                        _logger.LogError($"The payload of {nameof(InventoryMessage)} contains unknown {nameof(InventoryType)} \"{inventoryType}\".");
+                        break;
+                    }
             }
         }
 
         private async Task SendTransactions(IReadOnlyCollection<UInt256> transactionHashes, IPeer peer)
         {
-            var transactions = await this._blockchain.GetTransactions(transactionHashes);
+            var transactions = await _blockchain.GetTransactions(transactionHashes);
 
-            await peer.Send(new TransactionMessage(transactions));
+            // TODO: The more efficient operation would be to send many transactions per one message
+            // but it breaks backward compatibility
+            await Task.WhenAll(transactions.Select(t => peer.Send(new TransactionMessage(t))));
         }
 
         private async Task SendBlocks(IReadOnlyCollection<UInt256> blockHashes, IPeer peer)
         {
-            var blocks = await this._blockchain.GetBlocks(blockHashes);
+            var blocks = await _blockchain.GetBlocks(blockHashes);
+
+            if (!blocks.Any()) return;
 
             var filter = peer.BloomFilter;
+
             if (filter == null)
             {
-                await peer.Send(new BlockMessage(blocks));
+                // TODO: The more efficient operation would be to send many blocks per one message
+                // but it breaks backward compatibility
+                await Task.WhenAll(blocks.Select(b => peer.Send(new BlockMessage(b))));
             }
             else
             {

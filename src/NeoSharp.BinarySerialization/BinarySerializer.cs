@@ -9,10 +9,13 @@ namespace NeoSharp.BinarySerialization
 {
     public class BinarySerializer : IBinarySerializer
     {
-        // TODO: When we solve the injection problem we can remove this
+        public static IBinarySerializer Default { get; private set; } = new BinarySerializer();
 
-        public static readonly IBinarySerializer Default = new BinarySerializer();
-
+        //Use BinaryInitializer to inject IBinarySerializer
+        public static void Initialize(IBinarySerializer binarySerializer)
+        {
+            Default = binarySerializer;
+        }
         /// <summary>
         /// Constructor
         /// </summary>
@@ -33,6 +36,15 @@ namespace NeoSharp.BinarySerialization
         public static void RegisterTypes(params Assembly[] asms)
         {
             BinarySerializerCache.RegisterTypes(asms);
+        }
+
+        /// <summary>
+        /// Register types (call me if you load a new plugin or module)
+        /// </summary>
+        /// <param name="types">Types</param>
+        public static void RegisterTypes(params Type[] types)
+        {
+            BinarySerializerCache.RegisterTypes(types);
         }
 
         /// <summary>

@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Security;
+using System.Text;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NeoSharp.Core.Extensions;
@@ -62,6 +64,42 @@ namespace NeoSharp.Core.Test.Extensions
             var value = "FF".HexToBytes();
 
             value.Should().BeEquivalentTo(new byte[] { 255 });
+        }
+
+        [TestMethod]
+        public void SecureStringToByteArray()
+        {
+            var secureS = new SecureString();
+            secureS.AppendChar('x');
+            var value = secureS.ToByteArray();
+
+            value.Should().BeEquivalentTo(new byte[] { 120 });
+        }
+
+        [TestMethod]
+        public void SecureStringToByteArrayWithEuroSymbol()
+        {
+            var secureS = new SecureString();
+            secureS.AppendChar('€');
+            var value = secureS.ToByteArray();
+
+            value.Should().BeEquivalentTo(new byte[] { 226,  130, 172 });
+
+            var str = Encoding.UTF8.GetString(value);
+            str.Should().Equals("€");
+        }
+
+        [TestMethod]
+        public void SecureStringToByteArrayWithChineseChar()
+        {
+            var secureS = new SecureString();
+            secureS.AppendChar('小');
+            var value = secureS.ToByteArray();
+
+            value.Should().BeEquivalentTo(new byte[] { 229, 176, 143 });
+
+            var str = Encoding.UTF8.GetString(value);
+            Assert.IsTrue(str.Equals("小"));
         }
     }
 }

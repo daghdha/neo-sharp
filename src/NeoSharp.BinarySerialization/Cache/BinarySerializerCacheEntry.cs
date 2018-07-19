@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NeoSharp.BinarySerialization.SerializationHooks;
 using NeoSharp.BinarySerialization.Serializers;
@@ -27,11 +29,14 @@ namespace NeoSharp.BinarySerialization.Cache
         public readonly string Name;
         public readonly int MaxLength;
         public readonly bool ReadOnly;
+        public readonly bool Override;
         public readonly BinaryPropertyAttribute Context;
 
         // Cache
 
         private static Type _iListType = typeof(IList);
+        private static Type[] _iHashSetType = new Type[] { typeof(HashSet<>)/*, typeof(ISet<>)*/ };
+        private static Type[] _iDictionaryTypes = new Type[] { typeof(Dictionary<,>)/*, typeof(IDictionary<,>)*/ };
 
         /// <summary>
         /// Constructor
@@ -53,7 +58,7 @@ namespace NeoSharp.BinarySerialization.Cache
         {
             GetValue = fi.GetValue;
             SetValue = fi.SetValue;
-            ReadOnly = false;
+            ReadOnly = fi.IsInitOnly;
         }
         /// <summary>
         /// Constructor
@@ -63,20 +68,23 @@ namespace NeoSharp.BinarySerialization.Cache
         /// <param name="member">Member</param>
         public BinarySerializerCacheEntry(BinaryPropertyAttribute atr, Type type, MemberInfo member)
         {
+            Type = type;
             Name = member.Name ?? null;
 
-            Type = type;
             var isArray = type.IsArray;
             var isList = _iListType.IsAssignableFrom(type);
+            var isHashSet = type.IsGenericType && _iHashSetType.Contains(type.GetGenericTypeDefinition());
+            var isDic = type.IsGenericType && _iDictionaryTypes.Contains(type.GetGenericTypeDefinition());
 
             if (atr == null)
             {
                 Context = null;
-                MaxLength = 0;
-                Order = 0;
+                MaxLength = Order = 0;
+                Override = false;
             }
             else
             {
+                Override = atr.Override;
                 Context = atr;
                 MaxLength = atr.MaxLength;
                 Order = atr.Order;
@@ -91,33 +99,50 @@ namespace NeoSharp.BinarySerialization.Cache
                 if (isArray || isList)
                 {
                     // Extract type of array
+
                     type = type.GetElementType();
                 }
+                else
+                {
+                    if (isHashSet)
+                    {
+                        // Extract type of hashset
 
-                if (type.IsEnum)
+                        type = type.GetGenericArguments().FirstOrDefault();
+                    }
+                    else
+                    {
+                        if (isDic)
+                        {
+                            // Is dictionary
+
+                            var gen = type.GetGenericArguments();
+
+                            if (!TryRecursive(member, gen[0], out var key, MaxLength) ||
+                                !TryRecursive(member, gen[1], out var value, MaxLength))
+                            {
+                                throw new NotImplementedException();
+                            }
+
+                            Serializer = new BinaryDictionarySerializer(type, gen[0], key, gen[1], value, MaxLength);
+                            return;
+                        }
+                    }
+                }
+
+                var isEnum = type.IsEnum;
+
+                if (isEnum)
                 {
                     type = Enum.GetUnderlyingType(type);
                 }
 
                 // Try to extract the BinarySerializer
 
-                var serializerAttr = member.GetCustomAttribute<BinaryTypeSerializerAttribute>();
-                if (serializerAttr == null)
-                    serializerAttr = type.GetCustomAttribute<BinaryTypeSerializerAttribute>();
-
-                if (serializerAttr != null) Serializer = serializerAttr.Create();
-                else if (type == typeof(string)) Serializer = new BinaryStringSerializer(MaxLength);
-                else if (type == typeof(long)) Serializer = new BinaryInt64Serializer();
-                else if (type == typeof(ulong)) Serializer = new BinaryUInt64Serializer();
-                else if (type == typeof(int)) Serializer = new BinaryInt32Serializer();
-                else if (type == typeof(uint)) Serializer = new BinaryUInt32Serializer();
-                else if (type == typeof(short)) Serializer = new BinaryInt16Serializer();
-                else if (type == typeof(ushort)) Serializer = new BinaryUInt16Serializer();
-                else if (type == typeof(byte)) Serializer = new BinaryByteSerializer();
-                else if (type == typeof(sbyte)) Serializer = new BinarySByteSerializer();
-                else if (type == typeof(bool)) Serializer = new BinaryBoolSerializer();
-                else if (type == typeof(double)) Serializer = new BinaryDoubleSerializer();
-                else if (!TryRecursive(type, out Serializer)) throw new NotImplementedException();
+                if (!TryRecursive(member, type, out Serializer, MaxLength))
+                {
+                    throw new NotImplementedException();
+                }
 
                 if (isArray)
                 {
@@ -126,6 +151,14 @@ namespace NeoSharp.BinarySerialization.Cache
                 else if (isList)
                 {
                     Serializer = new BinaryListSerializer(Type, Serializer, MaxLength);
+                }
+                else if (isHashSet)
+                {
+                    Serializer = new BinaryHashSetSerializer(Type, Serializer, MaxLength);
+                }
+                else if (isEnum)
+                {
+                    Serializer = new BinaryEnumSerializer(Type, Serializer);
                 }
 
                 if (Serializer == null)
@@ -137,8 +170,79 @@ namespace NeoSharp.BinarySerialization.Cache
 
         #region Helpers
 
-        private static bool TryRecursive(Type type, out IBinaryCustomSerializable serializer)
+        internal static bool TryRecursive(MemberInfo member, Type type, out IBinaryCustomSerializable serializer, int maxLength)
         {
+            // Default types
+
+            var serializerAttr = member?.GetCustomAttribute<BinaryTypeSerializerAttribute>();
+
+            if (serializerAttr == null)
+            {
+                serializerAttr = type.GetCustomAttribute<BinaryTypeSerializerAttribute>();
+            }
+
+            if (serializerAttr != null)
+            {
+                serializer = serializerAttr.Create(); return true;
+            }
+            else if (type == typeof(string))
+            {
+                serializer = new BinaryStringSerializer(maxLength);
+                return true;
+            }
+            else if (type == typeof(long))
+            {
+                serializer = new BinaryInt64Serializer();
+                return true;
+            }
+            else if (type == typeof(ulong))
+            {
+                serializer = new BinaryUInt64Serializer();
+                return true;
+            }
+            else if (type == typeof(int))
+            {
+                serializer = new BinaryInt32Serializer();
+                return true;
+            }
+            else if (type == typeof(uint))
+            {
+                serializer = new BinaryUInt32Serializer();
+                return true;
+            }
+            else if (type == typeof(short))
+            {
+                serializer = new BinaryInt16Serializer();
+                return true;
+            }
+            else if (type == typeof(ushort))
+            {
+                serializer = new BinaryUInt16Serializer();
+                return true;
+            }
+            else if (type == typeof(byte))
+            {
+                serializer = new BinaryByteSerializer();
+                return true;
+            }
+            else if (type == typeof(sbyte))
+            {
+                serializer = new BinarySByteSerializer();
+                return true;
+            }
+            else if (type == typeof(bool))
+            {
+                serializer = new BinaryBoolSerializer();
+                return true;
+            }
+            else if (type == typeof(double))
+            {
+                serializer = new BinaryDoubleSerializer();
+                return true;
+            }
+
+            // Search in cache
+
             var cache = BinarySerializerCache.InternalRegisterTypes(type);
 
             if (cache == null)

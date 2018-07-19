@@ -14,7 +14,6 @@ namespace NeoSharp.Core.Test.Serializers
     public class UtBinarySerializerTx
     {
         private Random _random;
-        private ICrypto _crypto;
         private IBinarySerializer _serializer;
         private IBinaryDeserializer _deserializer;
 
@@ -22,7 +21,6 @@ namespace NeoSharp.Core.Test.Serializers
         public void WarmUpSerializer()
         {
             _random = new Random(Environment.TickCount);
-            _crypto = new BouncyCastleCrypto();
             _serializer = new BinarySerializer(typeof(BlockHeader).Assembly, typeof(UtBinarySerializer).Assembly);
             _deserializer = new BinaryDeserializer(typeof(BlockHeader).Assembly, typeof(UtBinarySerializer).Assembly);
         }
@@ -316,9 +314,9 @@ namespace NeoSharp.Core.Test.Serializers
             tx.Attributes = RandomTransactionAtrributes().ToArray();
             tx.Inputs = RandomCoinReferences(_random.Next(1, 255)).ToArray();
             tx.Outputs = RandomTransactionOutputs().ToArray();
-            tx.Scripts = RandomWitness().ToArray();
+            tx.Witness = RandomWitness().ToArray();
 
-            tx.UpdateHash(_serializer, _crypto);
+            tx.UpdateHash();
         }
 
         void EqualTx(Transaction original, params Transaction[] copies)
@@ -333,11 +331,11 @@ namespace NeoSharp.Core.Test.Serializers
                 CollectionAssert.AreEqual(original.Attributes, copy.Attributes);
                 CollectionAssert.AreEqual(original.Inputs, copy.Inputs);
                 CollectionAssert.AreEqual(original.Outputs, copy.Outputs);
-                CollectionAssert.AreEqual(original.Scripts, copy.Scripts);
+                CollectionAssert.AreEqual(original.Witness, copy.Witness);
 
                 // Recompute hash
 
-                copy.UpdateHash(_serializer, _crypto);
+                copy.UpdateHash();
 
                 Assert.AreEqual(original.Hash, copy.Hash);
             }

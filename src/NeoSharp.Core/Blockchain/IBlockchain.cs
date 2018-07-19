@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 using NeoSharp.Core.Caching;
+using NeoSharp.Core.Cryptography;
 using NeoSharp.Core.Models;
 using NeoSharp.Core.Types;
 
@@ -14,70 +14,44 @@ namespace NeoSharp.Core.Blockchain
         /// </summary>
         StampedPool<UInt256, Transaction> MemoryPool { get; }
 
-        Block CurrentBlock { get; }
-
-        BlockHeaderBase LastBlockHeader { get; }
+        /// <summary>
+        /// Blocks pool
+        /// </summary>
+        Pool<uint, Block> BlockPool { get; }
 
         Task InitializeBlockchain();
+
+        #region Blocks & BlockHeaders
+
+        /// <summary>
+        /// Current block
+        /// </summary>
+        Block CurrentBlock { get; }
+
+        /// <summary>
+        /// Last block header
+        /// </summary>
+        BlockHeader LastBlockHeader { get; }
 
         /// <summary>
         /// Add the specified block to the blockchain
         /// </summary>
         /// <param name="block"></param>
         /// <returns></returns>
-        bool AddBlock(Block block);
+        Task<bool> AddBlock(Block block);
 
         /// <summary>
         /// Add the specified block headers to the blockchain
         /// </summary>
         /// <param name="blockHeaders"></param>
-        void AddBlockHeaders(IEnumerable<BlockHeaderBase> blockHeaders);
+        Task AddBlockHeaders(IEnumerable<BlockHeader> blockHeaders);
 
         /// <summary>
         /// Determine whether the specified block is contained in the blockchain
         /// </summary>
         /// <param name="hash"></param>
         /// <returns></returns>
-        bool ContainsBlock(UInt256 hash);
-
-        /// <summary>
-        /// Determine whether the specified transaction is included in the blockchain
-        /// </summary>
-        /// <param name="hash">Transaction hash</param>
-        /// <returns>Return true if the specified transaction is included</returns>
-        bool ContainsTransaction(UInt256 hash);
-
-        bool ContainsUnspent(CoinReference input);
-
-        bool ContainsUnspent(UInt256 hash, ushort index);
-
-        MetaDataCache<T> GetMetaData<T>() where T : class, ISerializable, new();
-
-        /// <summary>
-        /// Return the corresponding asset information according to the specified hash
-        /// </summary>
-        /// <param name="hash">Hash</param>
-        /// <returns></returns>
-        Asset GetAsset(UInt256 hash);
-
-        /// <summary>
-        /// Return the corresponding contract information according to the specified hash
-        /// </summary>
-        /// <param name="hash">Hash</param>
-        /// <returns></returns>
-        Contract GetContract(UInt256 hash);
-
-        /// <summary>
-        /// Return all contracts
-        /// </summary>
-        /// <returns></returns>
-        IEnumerable<Contract> GetContracts();
-
-        /// <summary>
-        /// Return all assets
-        /// </summary>
-        /// <returns></returns>
-        IEnumerable<Asset> GetAssets();
+        Task<bool> ContainsBlock(UInt256 hash);
 
         /// <summary>
         /// Return the corresponding block information according to the specified height
@@ -93,6 +67,11 @@ namespace NeoSharp.Core.Blockchain
         /// <returns></returns>
         Task<Block> GetBlock(UInt256 hash);
 
+        /// <summary>
+        /// Get blocks
+        /// </summary>
+        /// <param name="blockHashes">Block hashes</param>
+        /// <returns>Block</returns>
         Task<IEnumerable<Block>> GetBlocks(IReadOnlyCollection<UInt256> blockHashes);
 
         /// <summary>
@@ -116,9 +95,6 @@ namespace NeoSharp.Core.Blockchain
         /// <returns></returns>
         Task<BlockHeader> GetBlockHeader(UInt256 hash);
 
-        ECPoint[] GetValidators();
-        IEnumerable<ECPoint> GetValidators(IEnumerable<Transaction> others);
-
         /// <summary>
         /// Returns the information for the next block based on the specified hash value
         /// </summary>
@@ -132,6 +108,56 @@ namespace NeoSharp.Core.Blockchain
         /// <param name="hash"></param>
         /// <returns></returns>
         Task<UInt256> GetNextBlockHash(UInt256 hash);
+
+        #endregion
+
+        #region Transactions
+
+        Task<bool> AddTransaction(Transaction transaction);
+
+        /// <summary>
+        /// Determine whether the specified transaction is included in the blockchain
+        /// </summary>
+        /// <param name="hash">Transaction hash</param>
+        /// <returns>Return true if the specified transaction is included</returns>
+        Task<bool> ContainsTransaction(UInt256 hash);
+
+        #endregion
+
+        bool ContainsUnspent(CoinReference input);
+
+        bool ContainsUnspent(UInt256 hash, ushort index);
+
+        MetaDataCache<T> GetMetaData<T>() where T : class, ISerializable, new();
+
+        /// <summary>
+        /// Return the corresponding asset information according to the specified hash
+        /// </summary>
+        /// <param name="hash">Hash</param>
+        /// <returns></returns>
+        Task<Asset> GetAsset(UInt256 hash);
+
+        /// <summary>
+        /// Return the corresponding contract information according to the specified hash
+        /// </summary>
+        /// <param name="hash">Hash</param>
+        /// <returns></returns>
+        Task<Contract> GetContract(UInt160 hash);
+
+        /// <summary>
+        /// Return all contracts
+        /// </summary>
+        /// <returns></returns>
+        Task<IEnumerable<Contract>> GetContracts();
+
+        /// <summary>
+        /// Return all assets
+        /// </summary>
+        /// <returns></returns>
+        Task<IEnumerable<Asset>> GetAssets();
+
+        ECPoint[] GetValidators();
+        IEnumerable<ECPoint> GetValidators(IEnumerable<Transaction> others);
 
         /// <summary>
         /// Returns the total amount of system costs contained in the corresponding block and all previous blocks based on the specified block height

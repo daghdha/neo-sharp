@@ -18,8 +18,8 @@ namespace NeoSharp.Core.Blockchain
         {
             BinarySerializer.RegisterTypes(typeof(PublishTransaction).Assembly, typeof(BlockHeader).Assembly);
 
-            var governingToken = GenesisAssets.GoverningTokenRegisterTransaction();
-            var utilityToken = GenesisAssets.UtilityTokenRegisterTransaction();
+            var governingToken = GenesisAssets.GoverningTokenRegisterTransaction;
+            var utilityToken = GenesisAssets.UtilityTokenRegisterTransaction;
 
             var genesisMinerTransaction = GenesisAssets.GenesisMinerTransaction();
             var genesisIssueTransaction = GenesisAssets.GenesisIssueTransaction();
@@ -37,7 +37,7 @@ namespace NeoSharp.Core.Blockchain
                 Index = 0,
                 ConsensusData = genesisConsensusData,
                 NextConsensus = nextConsensusAddress,
-                Script = genesisWitness,
+                Witness = genesisWitness,
                 Transactions = new Transaction[]
                    {
                     //First transaction is always a miner transaction
@@ -54,7 +54,7 @@ namespace NeoSharp.Core.Blockchain
             };
 
             // Compute hash
-            GenesisBlock.UpdateHash(BinarySerializer.Default, ICrypto.Default);
+            GenesisBlock.UpdateHash();
 
         }
 

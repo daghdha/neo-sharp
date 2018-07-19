@@ -56,11 +56,31 @@ namespace NeoSharp.Core.Extensions
             }
         }
 
+        /// <summary>
+        /// Performs the action for each element
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="source">Source</param>
+        /// <param name="action">Action</param>
         public static void ForEach<T>(this IEnumerable<T> source, Action<T> action)
         {
             foreach (var item in source)
             {
                 action(item);
+            }
+        }
+
+        public static IEnumerable<TSource> Distinct<TSource, TKey>
+            (this IEnumerable<TSource> source, Func<TSource, TKey> keySelector)
+        {
+            var keys = new HashSet<TKey>();
+
+            foreach (var item in source)
+            {
+                if (keys.Add(keySelector(item)))
+                {
+                    yield return item;
+                }
             }
         }
     }

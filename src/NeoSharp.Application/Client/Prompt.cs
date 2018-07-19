@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NeoSharp.Application.Attributes;
 using NeoSharp.BinarySerialization;
+using NeoSharp.BinarySerialization.DI;
 using NeoSharp.Core.Blockchain;
+using NeoSharp.Core.DI;
 using NeoSharp.Core.Extensions;
 using NeoSharp.Core.Logging;
 using NeoSharp.Core.Network;
@@ -140,16 +142,18 @@ namespace NeoSharp.Application.Client
         /// <param name="blockchain">Blockchain</param>
         /// <param name="walletManager"></param>
         public Prompt(
-            IConsoleReader consoleReaderInit, 
+            IConsoleReader consoleReaderInit,
             IConsoleWriter consoleWriterInit,
-            ILoggerFactoryExtended loggerFactory, 
-            Core.Logging.ILogger<Prompt> logger, 
+            ILoggerFactoryExtended loggerFactory,
+            Core.Logging.ILogger<Prompt> logger,
             INetworkManager networkManagerInit,
-            IServer serverInit, 
-            IRpcServer rpcInit, 
-            IBinarySerializer serializer, 
-            IBlockchain blockchain, 
-            IWalletManager walletManager)
+            IServer serverInit,
+            IRpcServer rpcInit,
+            IBinarySerializer serializer,
+            IBlockchain blockchain,
+            IWalletManager walletManager,
+            ICryptoInitializer cryptoInitializer,
+            IBinaryInitializer binaryInitializer)
         {
             _consoleReader = consoleReaderInit;
             _consoleWriter = consoleWriterInit;
@@ -177,7 +181,7 @@ namespace NeoSharp.Application.Client
                 _consoleReader.AppendInputs(args);
             }
 
-            this._blockchain.InitializeBlockchain();
+            _blockchain.InitializeBlockchain().Wait();
 
             while (!_exit)
             {
@@ -193,6 +197,7 @@ namespace NeoSharp.Application.Client
                 }
 
                 // Read input
+
                 var fullCmd = _consoleReader.ReadFromConsole(_commandAutocompleteCache);
 
                 if (string.IsNullOrWhiteSpace(fullCmd))
@@ -215,15 +220,15 @@ namespace NeoSharp.Application.Client
             cmdArgs.AddRange(command.SplitCommandLine());
             if (cmdArgs.Count <= 0) yield break;
 
-            foreach (KeyValuePair<string[], PromptCommandAttribute> key in _commandCache)
+            foreach (var key in _commandCache)
             {
                 if (key.Key.Length > cmdArgs.Count) continue;
 
-                bool equal = true;
+                var equal = true;
                 for (int x = 0, m = key.Key.Length; x < m; x++)
                 {
-                    CommandToken c = cmdArgs[x];
-                    if (c.Value.ToLowerInvariant() != key.Key[x])
+                    var c = cmdArgs[x];
+                    if (!string.Equals(c.Value, key.Key[x], StringComparison.InvariantCultureIgnoreCase))
                     {
                         equal = false;
                         break;
@@ -283,7 +288,9 @@ namespace NeoSharp.Application.Client
                 if (cmd == null)
                 {
                     if (cmds.Length > 0)
+                    {
                         throw (new Exception($"Wrong parameters for <{cmds.FirstOrDefault().Command}>"));
+                    }
 
                     throw (new Exception($"Command not found <{command}>"));
                 }
@@ -298,15 +305,23 @@ namespace NeoSharp.Application.Client
 
                         // Invoke
 
-                        cmd.Method.Invoke(this, cmd.ConvertToArguments(cmdArgs.Skip(cmd.CommandLength).ToArray()));
+                        var ret = cmd.Method.Invoke(this, cmd.ConvertToArguments(cmdArgs.Skip(cmd.CommandLength).ToArray()));
+
+                        if (ret is Task task)
+                        {
+                            task.Wait();
+                        }
                     }
 
                 return true;
             }
             catch (Exception e)
             {
-                string msg = e.InnerException != null ? e.InnerException.Message : e.Message;
+                var msg = e.InnerException != null ? e.InnerException.Message : e.Message;
                 _consoleWriter.WriteLine(msg, ConsoleOutputStyle.Error);
+#if DEBUG
+                _consoleWriter.WriteLine(e.ToString(), ConsoleOutputStyle.Error);
+#endif
 
                 PrintHelp(cmds);
                 return false;

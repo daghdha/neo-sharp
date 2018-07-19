@@ -6,59 +6,74 @@ using NeoSharp.Core.Types;
 
 namespace NeoSharp.Core.Models
 {
+    /// <summary>
+    /// Header and complete TX data
+    /// </summary>
     [Serializable]
-    public class Block : BlockHeaderBase
+    public class Block : BlockHeader
     {
         #region Serializable data
 
         /// <summary>
         /// Transactions
         /// </summary>
-        [BinaryProperty(100, MaxLength = 0x10000)]
+        [BinaryProperty(100, MaxLength = 0x10000, Override = true)]
         public Transaction[] Transactions;
 
         #endregion
 
         /// <summary>
+        /// Constructor
+        /// </summary>
+        public Block() : base(HeaderType.Extended) { }
+
+        /// <summary>
         /// Update hash
         /// </summary>
-        /// <param name="serializer">Serializer</param>
-        /// <param name="crypto">Crypto</param>
-        public override void UpdateHash(IBinarySerializer serializer, ICrypto crypto)
+        public override void UpdateHash()
         {
-            foreach (var tx in Transactions)
+            // Compute tx hashes
+
+            var txSize = Transactions.Length;
+            TransactionHashes = new UInt256[txSize];
+
+            for (var x = 0; x < txSize; x++)
             {
-                tx.UpdateHash(serializer, crypto);
+                Transactions[x].UpdateHash();
+                TransactionHashes[x] = Transactions[x].Hash;
             }
 
-            var transactionHashes = Transactions.Select(u => u.Hash).ToArray();
-            MerkleRoot = MerkleTree.ComputeRoot(crypto, transactionHashes);
+            MerkleRoot = MerkleTree.ComputeRoot(TransactionHashes.ToArray());
 
-            Hash = new UInt256(crypto.Hash256(serializer.Serialize(this, new BinarySerializerSettings()
+            // Compute hash
+
+            var serializedBlock = BinarySerializer.Default.Serialize(this, new BinarySerializerSettings()
             {
-                Filter = (a) => a != nameof(Script) && a != nameof(ScriptPrefix) && a != nameof(Transactions)
-            })));
+                Filter = (a) => a != nameof(Witness) && a != nameof(Transactions) && a != nameof(TransactionHashes) && a != nameof(Type)
+            });
 
-            Script?.UpdateHash(serializer, crypto);
+            Hash = new UInt256(Crypto.Default.Hash256(serializedBlock));
+
+            Witness?.UpdateHash();
         }
 
-        public static implicit operator BlockHeader(Block value)
+        /// <summary>
+        /// Get block header
+        /// </summary>
+        public BlockHeader GetBlockHeader()
         {
-            if (value == null) return null;
-
-            return new BlockHeader()
+            return new BlockHeader(HeaderType.Extended)
             {
-                ConsensusData = value.ConsensusData,
-                Hash = value.Hash,
-                Index = value.Index,
-                MerkleRoot = value.MerkleRoot,
-                NextConsensus = value.NextConsensus,
-                PreviousBlockHash = value.PreviousBlockHash,
-                Script = value.Script,
-                ScriptPrefix = value.ScriptPrefix,
-                Timestamp = value.Timestamp,
-                TransactionHashes = value.Transactions?.Select(u => u.Hash).ToArray(),
-                Version = value.Version
+                ConsensusData = ConsensusData,
+                Hash = Hash,
+                Index = Index,
+                MerkleRoot = MerkleRoot,
+                NextConsensus = NextConsensus,
+                PreviousBlockHash = PreviousBlockHash,
+                Witness = Witness,
+                Timestamp = Timestamp,
+                TransactionHashes = Transactions?.Select(u => u.Hash).ToArray(),
+                Version = Version
             };
         }
     }
