@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using NeoSharp.BinarySerialization;
-using NeoSharp.Core.Blockchain;
-using NeoSharp.Core.Cryptography;
-using NeoSharp.Core.Logging;
+using NeoSharp.Core.Blockchain.Processors;
 using NeoSharp.Core.Messaging.Messages;
 using NeoSharp.Core.Network;
 
@@ -13,8 +10,7 @@ namespace NeoSharp.Core.Messaging.Handlers
     {
         #region Variables
 
-        private readonly ILogger<BlockMessageHandler> _logger;
-        private readonly IBlockchain _blockchain;
+        private readonly IBlockProcessor _blockProcessor;
         private readonly IBroadcaster _broadcaster;
 
         #endregion
@@ -22,39 +18,19 @@ namespace NeoSharp.Core.Messaging.Handlers
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="blockchain">Blockchain</param>
+        /// <param name="blockProcessor">Block Pool</param>
         /// <param name="broadcaster">Broadcaster</param>
-        /// <param name="logger">Logger</param>
-        public BlockMessageHandler(IBlockchain blockchain, IBroadcaster broadcaster, ILogger<BlockMessageHandler> logger)
+        public BlockMessageHandler(IBlockProcessor blockProcessor, IBroadcaster broadcaster)
         {
-            _blockchain = blockchain ?? throw new ArgumentNullException(nameof(blockchain));
+            _blockProcessor = blockProcessor ?? throw new ArgumentNullException(nameof(blockProcessor));
             _broadcaster = broadcaster ?? throw new ArgumentNullException(nameof(broadcaster));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task Handle(BlockMessage message, IPeer sender)
         {
             var block = message.Payload;
-            if (block == null) return;
 
-            if (block.Hash == null)
-            {
-                block.UpdateHash();
-            }
-
-            var blockExists = await _blockchain.ContainsBlock(block.Hash);
-            if (blockExists)
-            {
-                _logger.LogInformation($"The block \"{block.Hash.ToString(true)}\" exists already on the blockchain.");
-                return;
-            }
-
-            var blockAdded = await _blockchain.AddBlock(block);
-            if (!blockAdded)
-            {
-                _logger.LogWarning($"The block \"{block.Hash.ToString(true)}\" was not added to the blockchain.");
-                return;
-            }
+            await _blockProcessor.AddBlock(block);
 
             _broadcaster.Broadcast(message, sender);
         }

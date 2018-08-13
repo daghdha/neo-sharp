@@ -25,6 +25,17 @@ namespace NeoSharp.Core.Test.Cryptography
         }
 
         [TestMethod]
+        public void Initialize()
+        {
+            // Act
+            Crypto.Initialize(_bccrypto);
+            Assert.AreEqual(_bccrypto.GetType(), Crypto.Default.GetType());
+
+            Crypto.Initialize(_nativecrypto);
+            Assert.AreEqual(_nativecrypto.GetType(), Crypto.Default.GetType());
+        }
+
+        [TestMethod]
         public void Sha256()
         {
             // Act
@@ -345,7 +356,7 @@ namespace NeoSharp.Core.Test.Cryptography
             // Arrange
             var results = new List<byte[]>();
 
-            for (var tries = 0; tries < 100; ++tries)
+            for (var tries = 0; tries < 50; ++tries)
             {
                 // Act
                 var value = _bccrypto.GenerateRandomBytes(10);

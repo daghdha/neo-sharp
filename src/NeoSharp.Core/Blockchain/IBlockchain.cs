@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using NeoSharp.Core.Caching;
 using NeoSharp.Core.Cryptography;
 using NeoSharp.Core.Models;
 using NeoSharp.Core.Types;
@@ -13,11 +12,6 @@ namespace NeoSharp.Core.Blockchain
         /// Memory pool
         /// </summary>
         StampedPool<UInt256, Transaction> MemoryPool { get; }
-
-        /// <summary>
-        /// Blocks pool
-        /// </summary>
-        Pool<uint, Block> BlockPool { get; }
 
         Task InitializeBlockchain();
 
@@ -34,24 +28,10 @@ namespace NeoSharp.Core.Blockchain
         BlockHeader LastBlockHeader { get; }
 
         /// <summary>
-        /// Add the specified block to the blockchain
-        /// </summary>
-        /// <param name="block"></param>
-        /// <returns></returns>
-        Task<bool> AddBlock(Block block);
-
-        /// <summary>
         /// Add the specified block headers to the blockchain
         /// </summary>
         /// <param name="blockHeaders"></param>
         Task AddBlockHeaders(IEnumerable<BlockHeader> blockHeaders);
-
-        /// <summary>
-        /// Determine whether the specified block is contained in the blockchain
-        /// </summary>
-        /// <param name="hash"></param>
-        /// <returns></returns>
-        Task<bool> ContainsBlock(UInt256 hash);
 
         /// <summary>
         /// Return the corresponding block information according to the specified height
@@ -127,8 +107,6 @@ namespace NeoSharp.Core.Blockchain
         bool ContainsUnspent(CoinReference input);
 
         bool ContainsUnspent(UInt256 hash, ushort index);
-
-        MetaDataCache<T> GetMetaData<T>() where T : class, ISerializable, new();
 
         /// <summary>
         /// Return the corresponding asset information according to the specified hash

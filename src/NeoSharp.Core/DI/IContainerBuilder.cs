@@ -5,6 +5,8 @@ namespace NeoSharp.Core.DI
 {
     public interface IContainerBuilder
     {
+        event Action<IContainer> OnBuild;
+        
         void Register<TService, TImplementation>()
             where TService : class
             where TImplementation : class, TService;
@@ -26,7 +28,7 @@ namespace NeoSharp.Core.DI
 
         void Register(Type service, Type implementation);
 
-        void Register(Type service, IEnumerable<Type> implementations);
+        void RegisterCollection(Type service, IEnumerable<Type> implementations);
 
         void RegisterInstance<TService>(TService instance)
             where TService : class;

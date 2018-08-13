@@ -1,7 +1,8 @@
-﻿using NeoSharp.Application.Client;
-using NeoSharp.BinarySerialization.DI;
+﻿using System.Linq;
+using NeoSharp.Application.Client;
 using NeoSharp.Core;
 using NeoSharp.Core.DI;
+using NeoSharp.Core.Extensions;
 
 namespace NeoSharp.Application.DI
 {
@@ -10,13 +11,19 @@ namespace NeoSharp.Application.DI
         public void Register(IContainerBuilder containerBuilder)
         {
             containerBuilder.Register<IBootstrapper, Bootstrapper>();
-
             containerBuilder.RegisterSingleton<IPrompt, Prompt>();
+            containerBuilder.RegisterSingleton<IPromptUserVariables, PromptUserVariables>();
             containerBuilder.RegisterSingleton<IConsoleReader, ConsoleReader>();
             containerBuilder.RegisterSingleton<IConsoleWriter, ConsoleWriter>();
-            containerBuilder.RegisterSingleton<ICryptoInitializer, CryptoInitializer>();
-            containerBuilder.RegisterSingleton<IBinaryInitializer, BinaryInitializer>();
+
+            // Get prompt controllers
+
+            var promptHandlerTypes = typeof(IPromptController).Assembly
+               .GetExportedTypes()
+               .Where(t => t.IsClass && !t.IsInterface && !t.IsAbstract && typeof(IPromptController).IsAssignableFrom(t))
+               .ToArray();
+
+            containerBuilder.RegisterCollection(typeof(IPromptController), promptHandlerTypes);
         }
     }
-
 }

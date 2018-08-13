@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using NeoSharp.Core.Blockchain;
-using NeoSharp.Core.Caching;
 using NeoSharp.Core.Cryptography;
 using NeoSharp.Core.Models;
 using NeoSharp.Core.Types;
@@ -17,19 +16,7 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
 
         public StampedPool<UInt256, Transaction> MemoryPool => new StampedPool<UInt256, Transaction>(PoolMaxBehaviour.DontAllowMore, 0, x => x.Value.Hash, null);
 
-        public Pool<uint, Block> BlockPool => new Pool<uint, Block>(PoolMaxBehaviour.RemoveFromEnd, 0, x => x.Index, null);
-
         public Task InitializeBlockchain()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<bool> AddBlock(Block block)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<bool> ContainsBlock(UInt256 hash)
         {
             throw new NotImplementedException();
         }
@@ -50,11 +37,6 @@ namespace NeoSharp.Core.Test.Messaging.Handlers
         }
 
         public bool ContainsUnspent(UInt256 hash, ushort index)
-        {
-            throw new NotImplementedException();
-        }
-
-        public MetaDataCache<T> GetMetaData<T>() where T : class, ISerializable, new()
         {
             throw new NotImplementedException();
         }

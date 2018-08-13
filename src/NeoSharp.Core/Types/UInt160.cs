@@ -1,17 +1,18 @@
 ﻿using System;
 using System.Collections;
 using System.ComponentModel;
-using System.IO;
 using System.Linq;
 using NeoSharp.BinarySerialization;
 using NeoSharp.Core.Converters;
+using NeoSharp.Core.Cryptography;
 using NeoSharp.Core.Extensions;
+using NeoSharp.Core.Wallet.Helpers;
 
 namespace NeoSharp.Core.Types
 {
     [TypeConverter(typeof(UInt160Converter))]
     [BinaryTypeSerializer(typeof(UInt160Converter))]
-    public class UInt160 : IEquatable<UInt160>, IComparable<UInt160>, ISerializable
+    public class UInt160 : IEquatable<UInt160>, IComparable<UInt160>
     {
         public static readonly int BufferLength = 20;
 
@@ -71,16 +72,6 @@ namespace NeoSharp.Core.Types
             return ((IStructuralComparable)_buffer).CompareTo(other._buffer, StructuralComparisons.StructuralComparer);
         }
 
-        public void Serialize(BinaryWriter writer)
-        {
-            writer.Write(_buffer);
-        }
-
-        public void Deserialize(BinaryReader reader)
-        {
-            reader.Read(_buffer, 0, _buffer.Length);
-        }
-
         public byte[] ToArray()
         {
             return _buffer.ToArray();
@@ -98,7 +89,12 @@ namespace NeoSharp.Core.Types
 
         public static UInt160 Parse(string value)
         {
-            return new UInt160(value.HexToBytes(BufferLength * 2).Reverse().ToArray());
+            if (value.IsHexString()) 
+            {
+                return new UInt160(value.HexToBytes(BufferLength * 2).Reverse().ToArray());
+            }
+
+            return value.ToScriptHash();
         }
 
         public static bool TryParse(string s, out UInt160 result)

@@ -6,9 +6,7 @@ using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using NeoSharp.BinarySerialization;
-using NeoSharp.BinarySerialization.DI;
 using NeoSharp.Core.Cryptography;
-using NeoSharp.Core.DI;
 using NeoSharp.Core.Models;
 using NeoSharp.Core.Persistence;
 using NeoSharp.Core.Types;
@@ -19,6 +17,16 @@ namespace NeoSharp.Persistence.RocksDB.Tests
     [TestClass]
     public class UtRocksDbRepository : TestBase
     {
+        private Mock<IBinaryDeserializer> _deserializerMock;
+        private Mock<IBinarySerializer> _serializerMock;
+
+        [TestInitialize]
+        public void TestInit()
+        {
+            _deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
+            _serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
+        }
+
         [TestMethod]
         public void Ctor_CreateValidRocksDbRepository()
         {
@@ -97,9 +105,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(x => x.Get(It.Is<byte[]>(b => b.SequenceEqual(new[] {(byte) DataEntryPrefix.SysVersion}))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock.Setup(m => m.Deserialize<string>(expectedBytes, null)).Returns(expectedResult);
-            var binaryInitialize = new BinaryInitializer(null, deserializerMock.Object);
+            _deserializerMock.Setup(m => m.Deserialize<string>(expectedBytes, null)).Returns(expectedResult);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetVersion();
@@ -112,9 +118,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
         {
             var input = RandomString(RandomInt(10));
             var expectedValue = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedValue);
-            var binaryInitialize = new BinaryInitializer(serializerMock.Object, null);
+            _serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedValue);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
@@ -245,17 +249,13 @@ namespace NeoSharp.Persistence.RocksDB.Tests
                 Hash = hash,
                 Index = index
             };
-
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock
+            _serializerMock
                 .Setup(x => x.Serialize(blockHeaderParameter, null))
                 .Returns(expectedBlockByteArray);
 
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
-
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
-            var binaryInitializer = new BinaryInitializer(serializerMock.Object, null);
             // Act
             await testee.AddBlockHeader(blockHeaderParameter);
 
@@ -305,9 +305,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildStateAccountKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock.Setup(m => m.Deserialize<Account>(expectedBytes, null)).Returns(expectedResult);
-            var binaryInitializer = new BinaryInitializer(null, deserializerMock.Object);
+            _deserializerMock.Setup(m => m.Deserialize<Account>(expectedBytes, null)).Returns(expectedResult);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetAccount(input);
@@ -323,9 +321,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
                 ScriptHash = UInt160.Parse(RandomInt().ToString("X40"))
             };
             var expectedBytes = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
-            var binaryInitializer = new BinaryInitializer(serializerMock.Object, null);
+            _serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
             await testee.AddAccount(input);
@@ -371,9 +367,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildStateCoinKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock.Setup(m => m.Deserialize<CoinState[]>(expectedBytes, null)).Returns(expectedResult);
-            var binaryInitializer = new BinaryInitializer(null, deserializerMock.Object);
+            _deserializerMock.Setup(m => m.Deserialize<CoinState[]>(expectedBytes, null)).Returns(expectedResult);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetCoinStates(input);
@@ -387,9 +381,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             var inputHash = UInt256.Parse(RandomInt().ToString("X64"));
             var inputStates = new[] {new CoinState()};
             var expectedBytes = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock.Setup(m => m.Serialize(inputStates, null)).Returns(expectedBytes);
-            var binaryInitializer = new BinaryInitializer(serializerMock.Object, null);
+            _serializerMock.Setup(m => m.Serialize(inputStates, null)).Returns(expectedBytes);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
             await testee.AddCoinStates(inputHash, inputStates);
@@ -439,9 +431,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildStateValidatorKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock.Setup(m => m.Deserialize<Validator>(expectedBytes, null)).Returns(expectedResult);
-            var binaryInitializer = new BinaryInitializer(null, deserializerMock.Object);
+            _deserializerMock.Setup(m => m.Deserialize<Validator>(expectedBytes, null)).Returns(expectedResult);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetValidator(input);
@@ -457,9 +447,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             var point = new ECPoint(pubkey);
             var input = new Validator {PublicKey = point};
             var expectedBytes = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
-            var binaryInitializer = new BinaryInitializer(serializerMock.Object, null);
+            _serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
             await testee.AddValidator(input);
@@ -508,9 +496,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildStateAssetKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock.Setup(m => m.Deserialize<Asset>(expectedBytes, null)).Returns(expectedResult);
-            var binaryInitialize = new BinaryInitializer(null, deserializerMock.Object);
+            _deserializerMock.Setup(m => m.Deserialize<Asset>(expectedBytes, null)).Returns(expectedResult);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetAsset(input);
@@ -524,9 +510,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             var inputHash = UInt256.Parse(RandomInt().ToString("X64"));
             var input = new Asset {Id = inputHash};
             var expectedBytes = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
-            var binaryInitialize = new BinaryInitializer(serializerMock.Object, null);
+            _serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
             await testee.AddAsset(input);
@@ -573,9 +557,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildStateContractKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock.Setup(m => m.Deserialize<Contract>(expectedBytes, null)).Returns(expectedResult);
-            var binaryInitializer = new BinaryInitializer(null, deserializerMock.Object);
+            _deserializerMock.Setup(m => m.Deserialize<Contract>(expectedBytes, null)).Returns(expectedResult);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetContract(input);
@@ -589,9 +571,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             var inputHash = UInt160.Parse(RandomInt().ToString("X40"));
             var input = new Contract {Code = new Code {ScriptHash = inputHash}};
             var expectedBytes = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
-            var binaryInitializer = new BinaryInitializer(serializerMock.Object, null);
+            _serializerMock.Setup(m => m.Serialize(input, null)).Returns(expectedBytes);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
             await testee.AddContract(input);
@@ -646,9 +626,7 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildStateStorageKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock.Setup(m => m.Deserialize<StorageValue>(expectedBytes, null)).Returns(expectedResult);
-            var binaryInitializer = new BinaryInitializer(null, deserializerMock.Object);
+            _deserializerMock.Setup(m => m.Deserialize<StorageValue>(expectedBytes, null)).Returns(expectedResult);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetStorage(input);
@@ -757,11 +735,9 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildIndexConfirmedKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock
+            _deserializerMock
                 .Setup(m => m.Deserialize<HashSet<CoinReference>>(expectedBytes, null))
                 .Returns(expectedReferences);
-            var binaryInitializer = new BinaryInitializer(null, deserializerMock.Object);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetIndexConfirmed(input);
@@ -790,11 +766,9 @@ namespace NeoSharp.Persistence.RocksDB.Tests
                 }
             }.ToHashSet();
             var expectedBytes = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock
+            _serializerMock
                 .Setup(m => m.Serialize(It.Is<HashSet<CoinReference>>(arr => arr.SetEquals(inputReferences)), null))
                 .Returns(expectedBytes);
-            var binaryInitializer = new BinaryInitializer(serializerMock.Object, null);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
@@ -842,11 +816,9 @@ namespace NeoSharp.Persistence.RocksDB.Tests
             rocksDbContextMock
                 .Setup(m => m.Get(It.Is<byte[]>(b => b.SequenceEqual(input.BuildIndexClaimableKey()))))
                 .ReturnsAsync(expectedBytes);
-            var deserializerMock = AutoMockContainer.GetMock<IBinaryDeserializer>();
-            deserializerMock
+            _deserializerMock
                 .Setup(m => m.Deserialize<HashSet<CoinReference>>(expectedBytes, null))
                 .Returns(expectedReferences);
-            var binaryInitializer = new BinaryInitializer(null, deserializerMock.Object);
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 
             var result = await testee.GetIndexClaimable(input);
@@ -875,11 +847,9 @@ namespace NeoSharp.Persistence.RocksDB.Tests
                 }
             }.ToHashSet();
             var expectedBytes = new byte[1];
-            var serializerMock = AutoMockContainer.GetMock<IBinarySerializer>();
-            serializerMock
+            _serializerMock
                 .Setup(m => m.Serialize(It.Is<HashSet<CoinReference>>(arr => arr.SetEquals(inputReferences)), null))
                 .Returns(expectedBytes);
-            var binaryInitializer = new BinaryInitializer(serializerMock.Object, null);
             var rocksDbContextMock = AutoMockContainer.GetMock<IRocksDbContext>();
             var testee = AutoMockContainer.Create<RocksDbRepository>();
 

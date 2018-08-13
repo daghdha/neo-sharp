@@ -3,24 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using NeoSharp.BinarySerialization;
 using NeoSharp.Core.Blockchain.Processors;
-using NeoSharp.Core.Caching;
 using NeoSharp.Core.Cryptography;
 using NeoSharp.Core.Models;
 using NeoSharp.Core.Persistence;
-using NeoSharp.Core.TaskManagers;
 using NeoSharp.Core.Types;
 
 namespace NeoSharp.Core.Blockchain
 {
-    public class Blockchain : IDisposable, IBlockchain
+    public class Blockchain : IBlockchain, IDisposable
     {
         #region Private fields
 
         private readonly IRepository _repository;
-        private readonly IProcessor<Block> _processor;
-        private CancellationTokenSource _cancelPersistTask;
+        private readonly IBlockProcessor _blockProcessor;
         private int _initialized;
 
         #endregion
@@ -37,20 +33,17 @@ namespace NeoSharp.Core.Blockchain
         public StampedPool<UInt256, Transaction> MemoryPool { get; } =
             new StampedPool<UInt256, Transaction>(PoolMaxBehaviour.RemoveFromEnd, 50_000, tx => tx.Value.Hash, TransactionComparer);
 
-        /// <inheritdoc />
-        public Pool<uint, Block> BlockPool { get; } =
-            new Pool<uint, Block>(PoolMaxBehaviour.RemoveFromEnd, 10_000, b => b.Index, (a, b) => a.Index.CompareTo(b.Index));
-
         #endregion
 
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="repository">Repository</param>
-        public Blockchain(IRepository repository, IProcessor<Block> blockProcessor)
+        /// <param name="blockProcessor">Block Processor</param>
+        public Blockchain(IRepository repository, IBlockProcessor blockProcessor)
         {
-            _repository = repository;
-            _processor = blockProcessor;
+            _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _blockProcessor = blockProcessor ?? throw new ArgumentNullException(nameof(blockProcessor));
             _initialized = 0;
         }
 
@@ -61,30 +54,38 @@ namespace NeoSharp.Core.Blockchain
                 return;
             }
 
-            var bHeight = await _repository.GetTotalBlockHeight();
-            var bHeader = await _repository.GetTotalBlockHeaderHeight();
+            var blockHeight = await _repository.GetTotalBlockHeight();
+            var blockHeaderHeight = await _repository.GetTotalBlockHeaderHeight();
 
-            CurrentBlock = await GetBlock(bHeight);
-            LastBlockHeader = await GetBlockHeader(bHeader);
+            CurrentBlock = await GetBlock(blockHeight);
+            LastBlockHeader = await GetBlockHeader(blockHeaderHeight);
+
+            _blockProcessor.OnBlockProcessed += BlockProcessed;
+            _blockProcessor.Run(CurrentBlock);
 
             if (CurrentBlock == null || LastBlockHeader == null)
             {
-                // This update last block header too
+                await _blockProcessor.AddBlock(Genesis.GenesisBlock);
+            }
+        }
 
-                await AddBlock(Genesis.GenesisBlock);
+        private async Task BlockProcessed(Block block)
+        {
+            foreach (var tx in block.Transactions)
+            {
+                // Try to remove the TX from the pool
+                MemoryPool.Remove(tx.Hash);
             }
 
-            _cancelPersistTask = new CancellationTokenSource();
+            CurrentBlock = block;
 
-            // TODO: Check Task system
+            if (LastBlockHeader == null || LastBlockHeader.Index < block.Index)
+            {
+                LastBlockHeader = block;
+                await _repository.SetTotalBlockHeaderHeight(block.Index);
+            }
 
-            IntervalScheduler.Run(TimeSpan.FromSeconds(1), _cancelPersistTask, async () =>
-              {
-                  while (await PersistBlock())
-                  {
-
-                  }
-              });
+            PersistCompleted?.Invoke(this, block);
         }
 
         private static int TransactionComparer(Stamp<Transaction> a, Stamp<Transaction> b)
@@ -102,99 +103,6 @@ namespace NeoSharp.Core.Blockchain
         }
 
         #region Blocks
-
-        /// <inheritdoc />
-        public Task<bool> AddBlock(Block block)
-        {
-            if (block.Hash == null)
-            {
-                block.UpdateHash();
-            }
-
-            if (CurrentBlock == null)
-            {
-                // Genesis
-
-                BlockPool.Push(block);
-
-                return PersistBlock();
-            }
-
-            // Small verification
-
-            if (block.Timestamp <= CurrentBlock.Timestamp ||
-                block.Index <= CurrentBlock.Index)
-            {
-                return Task.FromResult(false);
-            }
-
-            return Task.FromResult(BlockPool.Push(block));
-        }
-
-        /// <summary>
-        /// Persist block
-        /// </summary>
-        /// <returns>Bool</returns>
-        public async Task<bool> PersistBlock()
-        {
-            var block = BlockPool.PopFirstOrDefault();
-
-            if (block == null) return false;
-
-            if (block.Hash == null)
-            {
-                block.UpdateHash();
-            }
-
-            if (CurrentBlock != null)
-            {
-                // Do some checks
-
-                if (block.Timestamp <= CurrentBlock.Timestamp ||
-                    block.Index <= CurrentBlock.Index)
-                {
-                    return false;
-                }
-
-                if (block.PreviousBlockHash != CurrentBlock.Hash ||
-                    block.Index - 1 != CurrentBlock.Index)
-                {
-                    // Send back to the pool
-
-                    BlockPool.Push(block);
-
-                    return false;
-                }
-            }
-
-            await _processor.Process(block);
-
-            foreach (var tx in block.Transactions)
-            {
-                // Try to remove the TX from the pool
-                MemoryPool.Remove(tx.Hash);
-            }
-
-            CurrentBlock = block;
-
-            if (LastBlockHeader == null || LastBlockHeader.Index < block.Index)
-            {
-                LastBlockHeader = block;
-                await _repository.SetTotalBlockHeaderHeight(block.Index);
-            }
-
-            PersistCompleted?.Invoke(this, block);
-
-            return true;
-        }
-
-        /// <inheritdoc />
-        public async Task<bool> ContainsBlock(UInt256 hash)
-        {
-            var header = await _repository.GetBlockHeader(hash);
-
-            return header != null && header.Type == BlockHeader.HeaderType.Extended;
-        }
 
         /// <inheritdoc />
         public async Task<Block> GetBlock(uint height)
@@ -407,7 +315,7 @@ namespace NeoSharp.Core.Blockchain
             return Fixed8.Zero;
         }
 
-        public static Fixed8 CalculateBonus(IEnumerable<CoinReference> inputs, uint height_end)
+        public static Fixed8 CalculateBonus(IEnumerable<CoinReference> inputs, uint heightEnd)
         {
             return Fixed8.Zero;
         }
@@ -420,11 +328,6 @@ namespace NeoSharp.Core.Blockchain
         public bool ContainsUnspent(UInt256 hash, ushort index)
         {
             return false;
-        }
-
-        public MetaDataCache<T> GetMetaData<T>() where T : class, ISerializable, new()
-        {
-            return null;
         }
 
         /// <inheritdoc />
@@ -526,9 +429,10 @@ namespace NeoSharp.Core.Blockchain
         /// <inheritdoc />
         public void Dispose()
         {
-            _cancelPersistTask?.Cancel();
-            _cancelPersistTask?.Dispose();
-            _cancelPersistTask = null;
+            if (_initialized == 1)
+            {
+                _blockProcessor.OnBlockProcessed -= BlockProcessed;
+            }
         }
     }
 }

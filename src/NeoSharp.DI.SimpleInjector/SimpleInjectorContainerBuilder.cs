@@ -10,6 +10,8 @@ namespace NeoSharp.DI.SimpleInjector
         private readonly Container _container;
         private readonly SimpleInjectorContainer _containerAdapter;
 
+        public event Action<IContainer> OnBuild;
+
         public SimpleInjectorContainerBuilder()
         {
             _container = new Container();
@@ -54,9 +56,9 @@ namespace NeoSharp.DI.SimpleInjector
             _container.Register(service, implementation);
         }
 
-        public void Register(Type service, IEnumerable<Type> implementations)
+        public void RegisterCollection(Type service, IEnumerable<Type> implementations)
         {
-            _container.Register(service, implementations);
+            _container.Collection.Register(service, implementations);
         }
 
         public void Register<TService>(TService configuration)
@@ -97,6 +99,8 @@ namespace NeoSharp.DI.SimpleInjector
         public IContainer Build()
         {
             _container.Verify();
+
+            OnBuild?.Invoke(_containerAdapter);
 
             return _containerAdapter;
         }

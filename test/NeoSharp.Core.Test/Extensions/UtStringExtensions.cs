@@ -1,15 +1,42 @@
 ﻿using System;
+using System.Linq;
 using System.Security;
 using System.Text;
 using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NeoSharp.Core.Extensions;
+using NeoSharp.Core.Types;
 
 namespace NeoSharp.Core.Test.Extensions
 {
     [TestClass]
     public class UtStringExtensions
     {
+        [TestMethod]
+        public void CommandToToken()
+        {
+            // unquoted
+
+            var command = "sum";
+            var cmdArgs = command.SplitCommandLine().ToArray();
+
+            CollectionAssert.AreEqual(new CommandToken[] { new CommandToken("sum") }, cmdArgs);
+
+            // quoted
+
+            command = "\"sum numbers\" 1 2";
+            cmdArgs = command.SplitCommandLine().ToArray();
+
+            CollectionAssert.AreEqual(new CommandToken[] { new CommandToken("sum numbers", true), new CommandToken("1"), new CommandToken("2") }, cmdArgs);
+
+            // quoted & escaping
+
+            command = "\"sum \\\"numbers\\\"\" 1 2";
+            cmdArgs = command.SplitCommandLine().ToArray();
+
+            CollectionAssert.AreEqual(new CommandToken[] { new CommandToken("sum \"numbers\"", true), new CommandToken("1"), new CommandToken("2") }, cmdArgs);
+        }
+
         [TestMethod]
         public void Can_convert_null_hex_string_to_bytes()
         {
@@ -83,7 +110,7 @@ namespace NeoSharp.Core.Test.Extensions
             secureS.AppendChar('€');
             var value = secureS.ToByteArray();
 
-            value.Should().BeEquivalentTo(new byte[] { 226,  130, 172 });
+            value.Should().BeEquivalentTo(new byte[] { 226, 130, 172 });
 
             var str = Encoding.UTF8.GetString(value);
             str.Should().Equals("€");
@@ -100,6 +127,27 @@ namespace NeoSharp.Core.Test.Extensions
 
             var str = Encoding.UTF8.GetString(value);
             Assert.IsTrue(str.Equals("小"));
+        }
+
+        [TestMethod]
+        public void CheckHexStringUnsuccess()
+        {
+            var address = "ALhYzeoL7r7CLggtnyFpgF9kSxKuekWMGg";
+            Assert.IsFalse(address.IsHexString());
+        }
+
+        [TestMethod]
+        public void CheckHexStringSuccess()
+        {
+            var address = "736f6d6574657374";
+            Assert.IsTrue(address.IsHexString());
+        }
+
+        [TestMethod]
+        public void CheckHexStringSuccessWithZeroX()
+        {
+            var address = "0x736f6d6574657374";
+            Assert.IsTrue(address.IsHexString());
         }
     }
 }
