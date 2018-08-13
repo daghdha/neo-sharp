@@ -69,8 +69,6 @@ Feel free to contribute to this project after reading the
 
 Before starting to work on a certain topic, create an new issue first, describing the feature/topic you are going to implement. Please submit new pull requests to the `development` branch.
 
-Also, there is a [Trello board](https://trello.com/b/WwSwxpB7/city-of-zion-neo-sharp) to show the status of the project.
-
 # License
 
 - Open-source [MIT](https://github.com/CityOfZion/neo-sharp/blob/master/LICENCE.md)
